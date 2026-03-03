@@ -7,7 +7,9 @@ from shared.models import BaseModel
 from datetime import datetime,timedelta
 from config.settings import EMAIL_EXPIRATION_TIME,PHONE_EXPIATION_TIME
 import uuid
-import random
+import random,string
+from rest_framework_simplejwt.tokens import RefreshToken
+
 
 ORDINARY_USER, ADMIN, MANAGER, = ('ordinary_user', 'admin', 'manager')
 NEW, CODE_VERIFY, DONE, PHOTO_DONE, = ('new', 'code_verify',  'done', 'photo_done')
@@ -80,11 +82,37 @@ class CustomUser(AbstractUser,BaseModel):
         self.check_username()
         self.check_pass()
         self.hashing_pass()
-        return super().clean()
+
+
+    def token(self):
+        refresh_token =RefreshToken.for_user(self)
+        data = {
+            'refresh':str(refresh_token),
+            'access': str(refresh_token.access_token)
+        }
+        return data
+
+    def generate_code(self, verify_type):
+        d = string.ascii_letters
+        b = string.digits
+        m = d + b
+        code = ''
+        for i in range(4):
+            belgi = random.choice(m)
+            code = code + belgi
+        CodeVerify.objects.create(
+            code=code,
+            users=self,
+            verify_type=verify_type,
+        )
+        return code
+
+
+
 
     def save(self, *, force_insert = False, force_update = False, using = None, update_fields = None,):
         self.clean()
-        return super().save()
+        super().save()
 
 
 
