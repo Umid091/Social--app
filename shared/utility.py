@@ -1,10 +1,7 @@
 import re
-from http.client import responses
-
-from pyexpat.errors import messages
 from rest_framework import status
-from rest_framework.response import Response
-
+from django.core.mail import send_mail
+from config.settings import EMAIL_HOST_USER
 
 
 phone_regex = re.compile(r'^\+998[0-9]{9}$')
@@ -24,3 +21,12 @@ def check_email_or_phone(user_input):
         raise ValueError(response)
     return data
 
+
+
+def send_email(email, code):
+    send_mail(
+        subject='Tasdiqlash kodi',
+        message=f'Sizning tasdiqlash kodingiz....: {code}',
+        from_email=EMAIL_HOST_USER,
+        recipient_list=[email],
+    )

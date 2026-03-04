@@ -56,16 +56,14 @@ class CustomUser(AbstractUser,BaseModel):
     def check_username(self):
         if not self.username:
             temp_username = f'username{uuid.uuid4().__str__().split('-')[-1]}'
-            while CustomUser.objects.filter(username=temp_username).first().exists():
-                temp_username+=str(random.randint(0,9))
-
+            while CustomUser.objects.filter(username=temp_username).exists():
+                temp_username = f'{username}{uuid.uuid4().__str__().split("-")[-1]}'
             self.username = temp_username
+
 
     def check_pass(self):
         if not self.password:
-            temp_password =f'username{uuid.uuid4().__str__().split('-')[-1]}'
-
-        self.password = temp_password
+            self.password = f'username{uuid.uuid4().__str__().split("-")[-1]}'
 
     def hashing_pass(self):
         if  not self.password.startswith('pbkdf2_sha256'):
@@ -110,24 +108,9 @@ class CustomUser(AbstractUser,BaseModel):
 
 
 
-    def save(self, *, force_insert = False, force_update = False, using = None, update_fields = None,):
+    def save(self,*args ,**kwargs):
         self.clean()
-        super().save()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        super().save(*args ,**kwargs)
 
 
 
@@ -140,10 +123,11 @@ class CodeVerify(models.Model):
         (VIA_PHONE, VIA_PHONE)
 
     )
-    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    users = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     code = models.CharField(max_length=4)
     verify_type=models.CharField(max_length=30, choices=VERIFY_TYPE)
     expiration_time = models.DateTimeField()
+    is_active= models.BooleanField(default=True)
 
     def save(self, *args, **kwargs):
         if self.verify_type== VIA_EMAIL:
@@ -154,7 +138,7 @@ class CodeVerify(models.Model):
         return super().save(*args, **kwargs)
 
     def __str__(self):
-        return f'{self.user.username} | {self.code}'
+        return f'{self.users.username} | {self.code}'
 
 
 

@@ -41,10 +41,9 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'users',
     'shared',
-    'rest_framework.simplejwt',
+    'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
-
-
+    'rest_framework',
 
 ]
 
@@ -151,3 +150,22 @@ from datetime import datetime, timedelta
 
 EMAIL_EXPIRATION_TIME =3
 PHONE_EXPIATION_TIME =2
+
+
+REST_FRAMEWORK = {
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ],
+}
+
+AUTH_USER_MODEL = 'users.CustomUser'
+
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'umidjorayev091@gmail.com'
+EMAIL_HOST_PASSWORD = 'opvi tuox xkrb qwcp'
