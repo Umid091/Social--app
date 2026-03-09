@@ -1,7 +1,7 @@
 from django.http.request import validate_host
 from rest_framework import serializers,status
 from shared.utility import check_email_or_phone
-from .models import CustomUser, CodeVerify, VIA_EMAIL,VIA_PHONE
+from .models import CustomUser, CodeVerify, VIA_EMAIL,VIA_PHONE,CODE_VERIFY, DONE
 from rest_framework.exceptions import ValidationError
 from django.db.models import Q
 from shared.utility import send_email
@@ -38,6 +38,7 @@ class SignUpSerializer(serializers.ModelSerializer):
         else:
             raise ValidationError("Email yoki telifon raqam xato")
 
+        user.save()
         return user
 
 
@@ -90,6 +91,86 @@ class SignUpSerializer(serializers.ModelSerializer):
         data['access'] = instance.token()['access']
 
         return data
+
+
+
+from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
+from .models import CustomUser, CODE_VERIFY, DONE
+import re
+
+
+class UserChangeSerializer(serializers.Serializer):
+    first_name = serializers.CharField(required=True)
+    last_name = serializers.CharField(required=True)
+    username = serializers.CharField(required=True)
+    password = serializers.CharField(required=True, write_only=True)
+    confirm_password = serializers.CharField(required=True, write_only=True)
+
+    def validate_password(self, value):
+        if len(value) < 8:
+            raise ValidationError("Parol kamida 8 ta belgidan iborat bo'lishi kerak!")
+        if ' ' in value:
+            raise ValidationError("Parolda bo'sh joy bo'lmasligi kerak!")
+        return value
+
+    def validate_username(self, value):
+        value = value.strip()
+        if len(value) < 3:
+            raise ValidationError("Username kamida 3 ta belgi bo'lishi kerak!")
+        if ' ' in value:
+            raise ValidationError("Username da bo'sh joy bo'lmasligi kerak!")
+        if not re.match(r'^[a-zA-Z0-9_.-]+$', value):
+            raise ValidationError("Username faqat harf, raqam, '_', '-', '.' bo'lishi kerak!")
+        if CustomUser.objects.filter(username=value).exists():
+            raise ValidationError("Bu username band!")
+        return value
+
+    def validate_first_name(self, value):
+        value = value.strip()
+        if len(value) < 2:
+            raise ValidationError("ism kamida 2 ta belgi bo'lishi kerak")
+        if not re.match(r'^[a-zA-Zа-яА-ЯёЁ\s-]+$', value):
+            raise ValidationError("ismda faqat harflar bo'lishi kerak")
+        return value.title()
+
+    def validate_last_name(self, value):
+        value = value.strip()
+        if len(value) < 2:
+            raise ValidationError("Familiya kamida 2 ta belgi bo'lishi kerak")
+        if not re.match(r'^[a-zA-Zа-яА-ЯёЁ\s-]+$', value):
+            raise ValidationError("Familiyada faqat harflar bo'lishi kerak!")
+        return value.title()
+
+    def validate(self, attrs):
+        if attrs.get('password') != attrs.get('confirm_password'):
+            raise ValidationError({
+                "confirm_password": "Parollar mos kelmadi"
+            })
+        return attrs
+
+    def update(self, instance, validated_data):
+        if instance.auth_status != CODE_VERIFY:
+            raise ValidationError({"message": "Siz hali tasdiqlamagansiz"})
+        instance.first_name = validated_data.get('first_name')
+        instance.last_name = validated_data.get('last_name')
+        instance.username = validated_data.get('username')
+        instance.set_password(validated_data.get('password'))
+        instance.auth_status = DONE
+        instance.save()
+        return instance
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

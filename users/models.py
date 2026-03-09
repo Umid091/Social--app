@@ -1,5 +1,6 @@
 from math import remainder
-
+from django.utils import timezone
+from datetime import timedelta
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import FileExtensionValidator
@@ -123,17 +124,17 @@ class CodeVerify(models.Model):
         (VIA_PHONE, VIA_PHONE)
 
     )
-    users = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    users = models.ForeignKey(CustomUser, on_delete=models.CASCADE,related_name='verify_codes')
     code = models.CharField(max_length=4)
     verify_type=models.CharField(max_length=30, choices=VERIFY_TYPE)
     expiration_time = models.DateTimeField()
     is_active= models.BooleanField(default=True)
 
     def save(self, *args, **kwargs):
-        if self.verify_type== VIA_EMAIL:
-            self.expiration_time=datetime.now()+timedelta(minutes=EMAIL_EXPIRATION_TIME)
+        if self.verify_type == VIA_EMAIL:
+            self.expiration_time = timezone.now() + timedelta(minutes=EMAIL_EXPIRATION_TIME)
         else:
-            self.expiration_time=datetime.now()+ timedelta(minutes=PHONE_EXPIATION_TIME)
+            self.expiration_time = timezone.now() + timedelta(minutes=PHONE_EXPIATION_TIME)
 
         return super().save(*args, **kwargs)
 
