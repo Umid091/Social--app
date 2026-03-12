@@ -1,3 +1,4 @@
+from django.core.serializers import serialize
 from django.shortcuts import render
 from rest_framework import permissions, status
 from rest_framework.exceptions import ValidationError
@@ -6,10 +7,10 @@ from .models import CustomUser, NEW, CodeVerify as CodeVerifyModel, DONE, PHOTO_
 from shared.utility import send_email
 
 from rest_framework.generics import CreateAPIView
-from .serializers import SignUpSerializer,UserChangeSerializer
+from .serializers import SignUpSerializer,UserChangeSerializer,PhotoStatusSerializer, LoginSeializer
 from rest_framework.views import APIView
 from django.utils import timezone
-
+from rest_framework_simplejwt.views import TokenObtainPairView
 
 class SignUpView(CreateAPIView):
     permission_classes = (permissions.AllowAny,)
@@ -84,11 +85,13 @@ class GetNewCode(APIView):
         return Response(response_data)
 
 
+# views.py
+
 class UserChangeView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def put(self, request):
-        if request.user.auth_status != CODE_VERIFY:
+        if request.user.auth_status not in [CODE_VERIFY, DONE]:
             return Response({
                 "message": "Siz hali kod tasdiqlamagansiz!"
             }, status=status.HTTP_403_FORBIDDEN)
@@ -98,16 +101,53 @@ class UserChangeView(APIView):
             data=request.data,
             partial=False
         )
-        if serializer.is_valid():
-            user = serializer.save()
-            return Response({
-                "message": "Ro'yxatdan muvaffaqiyatli o'tdingiz",
-                "status": status.HTTP_200_OK,
-                "username": user.username,
-                "access": user.token()['access'],
-                "refresh": user.token()['refresh']
-            })
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+
+        return Response({
+            "message": "Ma'lumotlar muvaffaqiyatli yangilandi",
+            "username": user.username,
+            "access": user.token()['access'],
+            "refresh": user.token()['refresh']
+        }, status=status.HTTP_200_OK)
+
+
+
+class UserChangePhoto(APIView):
+    permission_classes = (permissions.IsAuthenticated, )
+
+    def patch(self, request):
+        user =request.user
+        serializer =PhotoStatusSerializer(data =request.data ,partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.update(instance=user ,validated_data=serializer.validated_data)
+
+        respons ={
+            'message':"Rasm qo'shildi",
+            'status':status.HTTP_200_OK,
+            'access':user.token()['access'],
+            "refresh": user.token()['refresh'],
+
+        }
+        return Response(respons)
+
+
+# class LoginView(TokenObtainPairView):
+#     serializer_class = LoginSeializer
+
+
+
+class LoginView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = LoginSeializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        return Response(serializer.validated_data, status=status.HTTP_200_OK)
+
+
+
+
 
 
 

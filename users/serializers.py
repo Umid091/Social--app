@@ -1,11 +1,12 @@
 from django.http.request import validate_host
 from rest_framework import serializers,status
-from shared.utility import check_email_or_phone
-from .models import CustomUser, CodeVerify, VIA_EMAIL,VIA_PHONE,CODE_VERIFY, DONE
+from shared.utility import check_email_or_phone,check_email_or_phone_or_username
+from .models import CustomUser, CodeVerify, VIA_EMAIL,VIA_PHONE,CODE_VERIFY, DONE,PHOTO_DONE
 from rest_framework.exceptions import ValidationError
 from django.db.models import Q
 from shared.utility import send_email
-
+from rest_framework_simplejwt.serializers import TokenObtainSerializer
+from django.contrib.auth import authenticate
 
 class SignUpSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(read_only=True)
@@ -100,6 +101,8 @@ from .models import CustomUser, CODE_VERIFY, DONE
 import re
 
 
+
+
 class UserChangeSerializer(serializers.Serializer):
     first_name = serializers.CharField(required=True)
     last_name = serializers.CharField(required=True)
@@ -122,16 +125,18 @@ class UserChangeSerializer(serializers.Serializer):
             raise ValidationError("Username da bo'sh joy bo'lmasligi kerak!")
         if not re.match(r'^[a-zA-Z0-9_.-]+$', value):
             raise ValidationError("Username faqat harf, raqam, '_', '-', '.' bo'lishi kerak!")
-        if CustomUser.objects.filter(username=value).exists():
+
+        user = self.instance
+        if CustomUser.objects.filter(username=value).exclude(pk=user.pk).exists():
             raise ValidationError("Bu username band!")
         return value
 
     def validate_first_name(self, value):
         value = value.strip()
         if len(value) < 2:
-            raise ValidationError("ism kamida 2 ta belgi bo'lishi kerak")
+            raise ValidationError("Ism kamida 2 ta belgi bo'lishi kerak")
         if not re.match(r'^[a-zA-Zа-яА-ЯёЁ\s-]+$', value):
-            raise ValidationError("ismda faqat harflar bo'lishi kerak")
+            raise ValidationError("Ismda faqat harflar bo'lishi kerak")
         return value.title()
 
     def validate_last_name(self, value):
@@ -150,8 +155,6 @@ class UserChangeSerializer(serializers.Serializer):
         return attrs
 
     def update(self, instance, validated_data):
-        if instance.auth_status != CODE_VERIFY:
-            raise ValidationError({"message": "Siz hali tasdiqlamagansiz"})
         instance.first_name = validated_data.get('first_name')
         instance.last_name = validated_data.get('last_name')
         instance.username = validated_data.get('username')
@@ -159,6 +162,98 @@ class UserChangeSerializer(serializers.Serializer):
         instance.auth_status = DONE
         instance.save()
         return instance
+
+
+
+class PhotoStatusSerializer(serializers.Serializer):
+
+    photo =serializers.ImageField()
+
+    def update(self, instance, validated_data):
+        photo =validated_data.get('photo',None)
+        if photo:
+            instance.photo=photo
+        if instance.auth_status ==DONE or instance.auth_status==PHOTO_DONE:
+            instance.auth_status=PHOTO_DONE
+        else:
+            raise ValidationError(detail="to'liq ro'yxatdan o'tilmagan")
+        instance.save()
+
+        return instance
+
+
+class LoginSeializer(TokenObtainSerializer):
+    password =serializers.CharField(required=True, write_only=True)
+
+
+    def __init__(self, *args,**kwargs):
+        super().__init__(*args,**kwargs)
+        self.fields['user_input'] = serializers.CharField(required=True, write_only=True)
+        self.fields['username'] =serializers.CharField(read_only=True)
+
+    def validate(self, attrs):
+        user =self.check_user_type(attrs)
+        respons = {
+            'message': "login bajarildi",
+            'access': user.token()['access'],
+            'refresh': user.token()['refresh'],
+        }
+
+        return respons
+
+
+
+    def check_user_type(self,data):
+        password = data.get('password')
+        user_input_data =data.get('user_input')
+        user_type =check_email_or_phone_or_username(user_input_data)
+
+        if user_type =='username':
+            print(user_type,"============================================")
+
+            user = CustomUser.objects.filter(username =user_input_data).first()
+            print(user,"++++++++++++++++++++++++++++++++++++++++++++++++")
+            self.get_object(user)
+            username = user_input_data
+        elif user_type =='email':
+            user = CustomUser.objects.filter(email__icontains=user_input_data.lower())
+            self.get_object(user)
+            username =user.username
+        elif user_type=='phone':
+            user =CustomUser.objects.filter(phone_number =user_input_data)
+            self.get_object(user)
+            username =user.username
+
+        else:
+            raise ValidationError(detail='malumot topilamdi')
+
+        authentication_kwargs = {
+            'password': password,
+            self.username_field: username
+
+        }
+        if user.auth_status  not in [DONE, PHOTO_DONE]:
+            raise ValidationError(detail="siz hali to'liq ro'yxatdan o'tmagansiz")
+
+        user =authenticate(**authentication_kwargs)
+        if not user:
+            raise ValidationError('login yoki parol xato')
+        return user
+
+    def get_object(self, user):
+        if not user:
+            raise ValidationError({"message":"login xato  kirittingiz" })
+        return True
+
+
+
+
+
+
+
+
+
+
 
 
 
