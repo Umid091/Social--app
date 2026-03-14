@@ -5,7 +5,8 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from .models import CustomUser, NEW, CodeVerify as CodeVerifyModel, DONE, PHOTO_DONE,VIA_PHONE,VIA_EMAIL,CODE_VERIFY
 from shared.utility import send_email
-
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt import token_blacklist
 from rest_framework.generics import CreateAPIView
 from .serializers import SignUpSerializer,UserChangeSerializer,PhotoStatusSerializer, LoginSeializer
 from rest_framework.views import APIView
@@ -145,6 +146,25 @@ class LoginView(APIView):
         serializer.is_valid(raise_exception=True)
         return Response(serializer.validated_data, status=status.HTTP_200_OK)
 
+
+
+class LogoutView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self,request):
+        refresh = self.request.data.get('refresh')
+        try:
+            refresh_token = RefreshToken(refresh)
+            refresh_token.blacklist()
+        except Exception as a:
+            raise ValidationError(detail='xatolik ')
+
+        else:
+            respons_data ={
+                'status': status.HTTP_200_OK,
+                'message':'tizimdan chiqdinggzi'
+        }
+            return Response(respons_data)
 
 
 
