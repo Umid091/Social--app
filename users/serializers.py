@@ -1,5 +1,7 @@
 from django.http.request import validate_host
 from rest_framework import serializers,status
+from rest_framework.response import Response
+
 from shared.utility import check_email_or_phone,check_email_or_phone_or_username
 from .models import CustomUser, CodeVerify, VIA_EMAIL,VIA_PHONE,CODE_VERIFY, DONE,PHOTO_DONE
 from rest_framework.exceptions import ValidationError
@@ -244,6 +246,71 @@ class LoginSeializer(TokenObtainSerializer):
         if not user:
             raise ValidationError({"message":"login xato  kirittingiz" })
         return True
+
+
+class ForgotPasswordSerializer(serializers.Serializer):
+    user_input = serializers.CharField(required=True, write_only=True)
+
+    def validate(self, attrs):
+        user_data = attrs.get('user_input', None)
+
+        if not user_data:
+            raise ValidationError(detail='Email, telefon raqam yoki username kiriting.')
+
+        user_data_type = check_email_or_phone_or_username(user_data)
+
+        user = CustomUser.objects.filter(Q(username=user_data) | Q(email=user_data) | Q(phone_number=user_data)).first()
+
+        if not user:
+            raise ValidationError('Email, telefon raqam yoki username xato kiritildi.')
+
+        if user_data_type == 'username':
+            if user.email:
+                code = user.generate_code(VIA_EMAIL)
+                send_email(user.email, code)
+                print("email Code::", code)
+            elif user.phone_number:
+                code = user.generate_code(VIA_PHONE)
+                print("phone Code::", code)
+            else:
+                raise ValidationError("Foydalanuvchida email yoki telefon yo'q.")
+
+        elif user_data_type == 'email':
+            code = user.generate_code(VIA_EMAIL)
+            send_email(user.email, code)
+            print("email Code::", code)
+
+        elif user_data_type == 'phone':
+            code = user.generate_code(VIA_PHONE)
+            print("phone Code::", code)
+
+        attrs['user'] = user
+        return attrs
+
+
+
+
+class ResetPasswordSerializer(serializers.Serializer):
+    password = serializers.CharField(required=True, write_only=True, min_length=8)
+    confirm_password = serializers.CharField(required=True, write_only=True)
+
+    def validate_password(self, value):
+        if ' ' in value:
+            raise ValidationError("Parolda bo'sh joy bo'lmasligi kerak!")
+        if value.isdigit():
+            raise ValidationError("Parol faqat raqamlardan iborat bo'lmasligi kerak!")
+        return value
+
+    def validate(self, attrs):
+        if attrs.get('password') != attrs.get('confirm_password'):
+            raise ValidationError({'confirm_password': 'Parollar mos kelmadi.'})
+        return attrs
+
+    def update(self, instance, validated_data):
+        instance.set_password(validated_data['password'])
+        instance.save()
+        return instance
+
 
 
 

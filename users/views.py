@@ -41,18 +41,18 @@ class CodeVerifyView(APIView):
         codes.update(is_active=False)
 
         if user.auth_status == NEW:
-            user.auth_status = DONE
+            user.auth_status = CODE_VERIFY
             user.save()
 
+        tokens = user.token()
         response_data = {
             "message": "kod tasdiqlandi",
             "status": status.HTTP_200_OK,
-            "access": user.token()['access'],
-            "refresh": user.token()['refresh']
+            "access": tokens['access'],
+            "refresh": tokens['refresh']
         }
 
         return Response(response_data)
-
 
 
 class GetNewCode(APIView):
@@ -165,6 +165,76 @@ class LogoutView(APIView):
                 'message':'tizimdan chiqdinggzi'
         }
             return Response(respons_data)
+
+class LoginRefresh(APIView):
+    permission_classes = (permissions.AllowAny, )
+
+    def get(self,request):
+        refresh =self.request.data.get('refresh',None)
+        try:
+            refresh_token = RefreshToken(refresh)
+        except Exception as e:
+            raise ValidationError(detail='xatolik')
+        else:
+            respons_data ={
+                'status':status.HTTP_201_CREATED,
+                'access':str(refresh_token.access_token)
+            }
+            return Response(respons_data)
+
+
+from .serializers import ForgotPasswordSerializer, ResetPasswordSerializer
+
+class ForgotPasswordView(APIView):
+
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = ForgotPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user = serializer.validated_data['user']
+        tokens = user.token()
+
+        return Response({
+            'message': 'Tasdiqlash kodi yuborildi.',
+            'access': tokens['access'],
+            'refresh': tokens['refresh'],
+        }, status=status.HTTP_200_OK)
+
+
+class ResetPasswordView(APIView):
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request):
+        user = request.user
+
+        if user.auth_status == CODE_VERIFY:
+            return Response(
+                {'message': 'Avval tasdiqlash kodini kiriting'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        serializer = ResetPasswordSerializer( instance=user, data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.update(instance=user, validated_data=serializer.validated_data)
+
+        tokens = user.token()
+        return Response({
+            'message': 'Parol muvaffaqiyatli yangilandi.',
+            'access': tokens['access'],
+            'refresh': tokens['refresh'],
+        })
+
+
+
+
+
+
+
+
+
 
 
 
