@@ -58,7 +58,7 @@ class CustomUser(AbstractUser,BaseModel):
         if not self.username:
             temp_username = f'username{uuid.uuid4().__str__().split('-')[-1]}'
             while CustomUser.objects.filter(username=temp_username).exists():
-                temp_username = f'{username}{uuid.uuid4().__str__().split("-")[-1]}'
+                temp_username = f'username{uuid.uuid4().__str__().split("-")[-1]}'
             self.username = temp_username
 
 

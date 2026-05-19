@@ -218,13 +218,13 @@ class LoginSeializer(TokenObtainSerializer):
             self.get_object(user)
             username = user_input_data
         elif user_type =='email':
-            user = CustomUser.objects.filter(email__icontains=user_input_data.lower())
+            user = CustomUser.objects.filter(email__icontains=user_input_data.lower()).first()
             self.get_object(user)
-            username =user.username
+            username = user.username
         elif user_type=='phone':
-            user =CustomUser.objects.filter(phone_number =user_input_data)
+            user = CustomUser.objects.filter(phone_number=user_input_data).first()
             self.get_object(user)
-            username =user.username
+            username = user.username
 
         else:
             raise ValidationError(detail='malumot topilamdi')
